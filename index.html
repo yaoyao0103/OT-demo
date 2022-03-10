@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src = "Op.js"></script>
+    <title>OT test</title>
+    <style>
+        #btns, #testData, #clientA, #clientB{
+            border: 1px;
+            border-style: solid;
+            border-color: #000;
+        } 
+        #A_index, #B_index{
+            width: 30px;
+        }
+        #A_parent, #B_parent{
+            width: 80px;
+        }
+        p{
+            color: red;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div id = "btns">
+        <label for="A_op">ClientA's Op:</label>
+        <select name="A_op" id="A_op">
+            <option value="INSERT">INSERT</option>
+            <option value="DELETE">DELETE</option>
+            <option value="EDIT">EDIT</option>
+            <option value="FOCUS">FOCUS</option>
+        </select>
+
+        <label for="A_parent">parent</label>
+        <input type="text" id = "A_parent" value = "outerBlock"/>
+
+        <label for="A_index">index</label>
+        <input type="number" id = "A_index"/>
+
+        <label for="A_content">content</label>
+        <input type="text" id = "A_content" value = "I am block I"/>
+
+        <label for="B_op">ClientB's Op:</label>
+        <select name="B_op" id="B_op">
+            <option value="INSERT">INSERT</option>
+            <option value="DELETE">DELETE</option>
+            <option value="EDIT">EDIT</option>
+            <option value="FOCUS">FOCUS</option>
+        </select>
+
+        <label for="B_parent">parent</label>
+        <input type="text" id = "B_parent" value = "outerBlock"/>
+
+        <label for="B_index">index</label>
+        <input type="number" id = "B_index"/>
+
+        <label for="B_content">content</label>
+        <input type="text" id = "B_content" value = "I am block J"/>
+
+        <!-- <input type="button" onclick = "reset()" value = "reset"/> -->
+        <input type="button" onclick = "OT()" value = "run"/>
+    </div>
+    <hr/>
+    <div id = "testData">
+        <div id = 'outerBlock'>
+            <p>Origin</p>
+            <div>I am block A</div>
+            <div>I am block B</div>
+            <div>I am block C</div>
+            <div>I am block D</div>
+            <div>I am block E</div>
+        </div>
+    </div>
+    <hr/>
+    <div id = "clientA">
+        <div id = 'A_outerBlock'>
+            <p>Client A</p>
+            <div>I am block A</div>
+            <div>I am block B</div>
+            <div>I am block C</div>
+            <div>I am block D</div>
+            <div>I am block E</div>
+        </div>
+    </div>
+    <div id = "clientB">
+        <div id = 'B_outerBlock'>
+            <p>Client B</p>
+            <div>I am block A</div>
+            <div>I am block B</div>
+            <div>I am block C</div>
+            <div>I am block D</div>
+            <div>I am block E</div>
+        </div>
+    </div>
+    <script>
+
+        function sleep(time) {
+            return new Promise((resolve) => setTimeout(resolve, time));
+        }
+        function contain(refParentId, refIndex, tarParentId, tarIndex){
+            return false;
+        }
+        function TII(tarBlockOp, refBlockOp){
+            let tarUId = tarBlockOp.UId;
+            let refUId = refBlockOp.UId;
+            let tarParentId = tarBlockOp.parentId;
+            let refParentId = refBlockOp.parentId;
+            let tarIndex = tarBlockOp.index;
+            let refIndex = refBlockOp.index;
+            let tarOp = tarBlockOp.opName;
+            let tarContent = tarBlockOp.content;
+            if(tarParentId != refParentId || tarIndex < refIndex || (tarParentId == refParentId && tarIndex == refIndex && tarUId > refUId)){
+                return tarBlockOp;
+            }
+            // 其他
+            else{
+                let xFormedOp = new Op(tarUId, tarOp, tarParentId, tarIndex + 1, tarContent);
+                return xFormedOp;
+            }
+        }
+        function TID(tarBlockOp, refBlockOp){
+            let tarUId = tarBlockOp.UId;
+            let refUId = refBlockOp.UId;
+            let tarParentId = tarBlockOp.parentId;
+            let refParentId = refBlockOp.parentId;
+            let tarIndex = tarBlockOp.index;
+            let refIndex = refBlockOp.index;
+            let tarOp = tarBlockOp.opName;
+            let tarContent = tarBlockOp.content;
+            if(contain(refParentId, refIndex, tarParentId, tarIndex)){
+                let xFormedOp = new Op(tarUId, 'null', tarParentId, tarIndex, tarContent);
+                return xFormedOp;
+            }
+            // 若在以下條件: 1. 不在同個parent下  2. 目標index小於等於參考index => 則不改變操作
+            else if(tarParentId != refParentId || tarIndex <= refIndex)
+                return tarBlockOp;
+            // 其他
+            else{
+                let xFormedOp = new Op(tarUId, tarOp, tarParentId, tarIndex - 1, tarContent);
+                return xFormedOp;
+            }
+        }
+
+        function TDI(tarBlockOp, refBlockOp){
+            let tarUId = tarBlockOp.UId;
+            let refUId = refBlockOp.UId;
+            let tarParentId = tarBlockOp.parentId;
+            let refParentId = refBlockOp.parentId;
+            let tarIndex = tarBlockOp.index;
+            let refIndex = refBlockOp.index;
+            let tarOp = tarBlockOp.opName;
+            let tarContent = tarBlockOp.content;
+            // 若在以下條件: 1. 不在同個parent下  2. 目標index小於參考index => 則不改變操作 (因為目標包含參考不需要改變，所以不多寫出來)
+            if(tarParentId != refParentId || tarIndex < refIndex)
+                return tarBlockOp;
+            //其他
+            else{
+                let xFormedOp = new Op(tarUId, tarOp, tarParentId, tarIndex + 1, tarContent);
+                return xFormedOp;
+            }
+        }
+
+        function TIE(tarBlockOp, refBlockOp){
+            return tarBlockOp;
+        }
+        function TEI(tarBlockOp, refBlockOp){
+            let tarUId = tarBlockOp.UId;
+            let refUId = refBlockOp.UId;
+            let tarParentId = tarBlockOp.parentId;
+            let refParentId = refBlockOp.parentId;
+            let tarIndex = tarBlockOp.index;
+            let refIndex = refBlockOp.index;
+            let tarOp = tarBlockOp.opName;
+            let tarContent = tarBlockOp.content;
+            //若在以下條件: 1. 不在同個parent下  2. 目標index小於參考index => 則不改變操作
+            if(tarParentId != refParentId || tarIndex < refIndex)
+                return tarBlockOp;
+            //其他
+            else{
+                let xFormedOp = new Op(tarUId, tarOp, tarParentId, tarIndex + 1, tarContent);
+                return xFormedOp;
+            }
+        }
+
+        function TIF(tarBlockOp, refBlockOp){
+            return tarBlockOp;
+        }
+        function TFI(tarBlockOp, refBlockOp){
+            let tarUId = tarBlockOp.UId;
+            let refUId = refBlockOp.UId;
+            let tarParentId = tarBlockOp.parentId;
+            let refParentId = refBlockOp.parentId;
+            let tarIndex = tarBlockOp.index;
+            let refIndex = refBlockOp.index;
+            let tarOp = tarBlockOp.opName;
+            let tarContent = tarBlockOp.content;
+            //目標parent包住參考parent，目標操作直接執行
+            if(contain(tarParentId,refParentId))
+                return tarBlockOp;
+            //參考parent包住目標parent，不會發生
+            //若在以下條件: 1. 不在同個parent下  2. 目標index小於或參考index => 則不改變操作
+            if(tarParentId != refParentId || tarIndex < refIndex)
+                return tarBlockOp;
+            //若在以下條件:目標index大於等於參考index =>操作index+1
+            else{
+                let xFormedOp = new Op(tarUId, tarOp, tarParentId, tarIndex + 1, tarContent);
+                return xFormedOp;
+            }
+        }
+        function TDE(tarBlockOp, refBlockOp){
+            return tarBlockOp;
+        }
+        function TED(tarBlockOp, refBlockOp){
+            let tarUId = tarBlockOp.UId;
+            let refUId = refBlockOp.UId;
+            let tarParentId = tarBlockOp.parentId;
+            let refParentId = refBlockOp.parentId;
+            let tarIndex = tarBlockOp.index;
+            let refIndex = refBlockOp.index;
+            let tarOp = tarBlockOp.opName;
+            let tarContent = tarBlockOp.content;
+            //目標parent包住參考parent，不會有這個操作，因為會鎖住
+            //參考parent包住目標parent，不會有這個操作，因為會鎖住
+            //若在以下條件: 1. 不在同個parent下  2. 目標index小於參考index => 則不改變操作
+            if(tarParentId != refParentId || tarIndex <= refIndex)
+                return tarBlockOp;
+            //若在以下條件: 目標index大於參考index => 則目標index-1
+            else{
+                let xFormedOp = new Op(tarUId, tarOp, tarParentId, tarIndex - 1, tarContent);
+                return xFormedOp;
+            }
+            //其他(目標與參考index相等)，不會有這種操作，因為要先focus
+        }
+
+        function TDF(tarBlockOp, refBlockOp){
+            return tarBlockOp;
+        }
+        function TFD(tarBlockOp, refBlockOp){
+            let tarUId = tarBlockOp.UId;
+            let refUId = refBlockOp.UId;
+            let tarParentId = tarBlockOp.parentId;
+            let refParentId = refBlockOp.parentId;
+            let tarIndex = tarBlockOp.index;
+            let refIndex = refBlockOp.index;
+            let tarOp = tarBlockOp.opName;
+            let tarContent = tarBlockOp.content;
+            //其他(目標與參考index相等)，不會有這種操作，因為要先focus
+            if(tarParentId != refParentId || tarIndex <= refIndex){
+                return tarBlockOp;
+            }
+            //條件: tarIndex > refIndex 或者其他
+            else{
+                let xFormedOp = new Op(tarUId, tarOp, tarParentId, tarIndex - 1, tarContent);
+                    return xFormedOp;
+            }
+        }
+        function TDD(tarBlockOp, refBlockOp){
+            let tarUId = tarBlockOp.UId;
+            let refUId = refBlockOp.UId;
+            let tarParentId = tarBlockOp.parentId;
+            let refParentId = refBlockOp.parentId;
+            let tarIndex = tarBlockOp.index;
+            let refIndex = refBlockOp.index;
+            let tarOp = tarBlockOp.opName;
+            let tarContent = tarBlockOp.content;
+            // 目標包住參考 目標操作則不改變
+            if(contain(tarParentId,tarIndex,refParentId,refIndex)) return tarBlockOp;
+            // 參考包住目標 目標操作直接不執行
+            else if(contain(refParentId,refIndex, tarParentId,tarIndex)){
+                let xFormedOp = new Op(tarUId, 'null', tarParentId, tarIndex, tarContent);
+                return xFormedOp;
+            }
+            // 若在以下條件: 1. 不在同個parent下  2. 目標index小於參考index => 則不改變操作 (因為目標包含參考不需要改變，所以不多寫出來)
+            if(tarParentId != refParentId || tarIndex < refIndex)
+                return tarBlockOp;
+            //若在以下條件: 目標index大於參考index =>則將目標index-1
+            else if(tarIndex > refIndex){
+                let xFormedOp = new Op(tarUId, tarOp, tarParentId, tarIndex - 1, tarContent);
+                return xFormedOp;
+            }
+            //其他:index相等,不回傳重複操作
+            else{
+                let xFormedOp = new Op(tarUId, 'null', tarParentId, tarIndex, tarContent);
+                return xFormedOp;
+            }
+        }
+
+        function TEF(tarBlockOp, refBlockOp){
+            return tarBlockOp;
+        }
+        function TFE(tarBlockOp, refBlockOp){
+            return tarBlockOp;
+        }
+
+        function TEE(tarBlockOp, refBlockOp){
+            return tarBlockOp;
+        }
+        function TFF(tarBlockOp, refBlockOp){
+            return tarBlockOp;
+        }
+
+
+        function reset(){
+            document.getElementById("clientA").innerHTML = "<div id = 'A-outerBlock'> \
+                <p>Client A</p> \
+                <div>I am block A</div> \
+                <div>I am block B</div> \
+                <div>I am block C</div> \
+                <div>I am block D</div> \
+                <div>I am block E</div> \
+            </div>"
+            document.getElementById("clientB").innerHTML = "<div id = 'B-outerBlock'> \
+                <p>Client B</p> \
+                <div>I am block A</div> \
+                <div>I am block B</div> \
+                <div>I am block C</div> \
+                <div>I am block D</div> \
+                <div>I am block E</div> \
+            </div>"
+        }
+
+        function OT(){
+            let A_op = document.getElementById("A_op").value;
+            let B_op = document.getElementById("B_op").value;
+            let A_parent= document.getElementById("A_parent").value;
+            let B_parent = document.getElementById("B_parent").value;
+            let A_index = parseInt(document.getElementById("A_index").value);
+            let B_index = parseInt(document.getElementById("B_index").value);
+            let A_content = document.getElementById("A_content").value;
+            let B_content = document.getElementById("B_content").value;
+            let blockOpA = new Op(1, A_op, A_parent, A_index, A_content);
+            let blockOpB = new Op(2, B_op, B_parent, B_index, B_content);
+            let newNodeA;
+            let newTextNodeA;
+            let newNodeB;
+            let newTextNodeB;
+            let nodeOfClientA;
+            let nodeOfClientB;
+            let children;
+            
+            let xFormedOpA; // A'
+            let xFormedOpB; // B'
+            if(blockOpA.opName === 'INSERT'){
+                //create new node
+                newNodeA = document.createElement('div');
+                newTextNodeA = document.createTextNode(A_content);
+                newNodeA.appendChild(newTextNodeA);
+                //apply locally
+                nodeOfClientA = document.getElementById('A_' + A_parent);
+                children = nodeOfClientA.children;
+                nodeOfClientA.insertBefore(newNodeA, children[A_index]);  
+            }
+            else if(blockOpA.opName === 'DELETE'){
+                nodeOfClientA = document.getElementById('A_' + A_parent);
+                children = nodeOfClientA.children;
+                nodeOfClientA.removeChild(children[A_index]);  
+            }
+            else if(blockOpA.opName === 'EDIT'){
+                nodeOfClientA = document.getElementById('A_' + A_parent);
+                children = nodeOfClientA.children;
+                children[A_index].innerHTML = A_content;
+            }
+            if(blockOpB.opName === 'INSERT'){
+                //create new node
+                newNodeB = document.createElement('div');
+                newTextNodeB = document.createTextNode(B_content);
+                newNodeB.appendChild(newTextNodeB);
+                //apply locally
+                nodeOfClientB = document.getElementById('B_' + B_parent);
+                children = nodeOfClientB.children;
+                nodeOfClientB.insertBefore(newNodeB, children[B_index]);
+            }
+            else if(blockOpB.opName === 'DELETE'){
+                nodeOfClientB = document.getElementById('B_' + B_parent);
+                children = nodeOfClientB.children;
+                nodeOfClientB.removeChild(children[B_index]);  
+            }
+            else if(blockOpB.opName === 'EDIT'){
+                nodeOfClientB = document.getElementById('B_' + B_parent);
+                children = nodeOfClientB.children;
+                children[B_index].innerHTML = B_content;
+            }
+            
+            if(A_op === 'INSERT'){
+                if(B_op === 'INSERT'){
+                    xFormedOpA = TII(blockOpA, blockOpB); // get A'
+                    xFormedOpB = TII(blockOpB, blockOpA); // get B'
+                }
+                else if(B_op === 'DELETE'){
+                    xFormedOpA = TID(blockOpA, blockOpB); // get A'
+                    xFormedOpB = TDI(blockOpB, blockOpA); // get B'
+                }
+                else if(B_op === 'EDIT'){
+                    xFormedOpA = TIE(blockOpA, blockOpB); // get A'
+                    xFormedOpB = TEI(blockOpB, blockOpA); // get B'
+                }
+                else if(B_op === 'FOCUS'){
+                    xFormedOpA = TIF(blockOpA, blockOpB); // get A'
+                    xFormedOpB = TFI(blockOpB, blockOpA); // get B'
+                }
+            }
+            else if(A_op === 'DELETE'){
+                if(B_op === 'INSERT'){
+                    xFormedOpA = TDI(blockOpA, blockOpB); // get A'
+                    xFormedOpB = TID(blockOpB, blockOpA); // get B'
+                }
+                else if(B_op === 'DELETE'){
+                    xFormedOpA = TDD(blockOpA, blockOpB); // get A'
+                    xFormedOpB = TDD(blockOpB, blockOpA); // get B'
+                }
+                else if(B_op === 'EDIT'){
+                    xFormedOpA = TDE(blockOpA, blockOpB); // get A'
+                    xFormedOpB = TED(blockOpB, blockOpA); // get B'
+                }
+                else if(B_op === 'FOCUS'){
+                    xFormedOpA = TDF(blockOpA, blockOpB); // get A'
+                    xFormedOpB = TFD(blockOpB, blockOpA); // get B'
+                }
+            }
+            else if(A_op === 'EDIT'){
+                if(B_op === 'INSERT'){
+                    xFormedOpA = TEI(blockOpA, blockOpB); // get A'
+                    xFormedOpB = TIE(blockOpB, blockOpA); // get B'
+                }
+                else if(B_op === 'DELETE'){
+                    xFormedOpA = TED(blockOpA, blockOpB); // get A'
+                    xFormedOpB = TDE(blockOpB, blockOpA); // get B'
+                }
+                else if(B_op === 'EDIT'){
+                    xFormedOpA = TEE(blockOpA, blockOpB); // get A'
+                    xFormedOpB = TEE(blockOpB, blockOpA); // get B'
+                }
+                else if(B_op === 'FOCUS'){
+                    xFormedOpA = TEF(blockOpA, blockOpB); // get A'
+                    xFormedOpB = TFE(blockOpB, blockOpA); // get B'
+                }
+            }
+            else if(A_op === 'FOCUS'){
+                if(B_op === 'INSERT'){
+                    xFormedOpA = TFI(blockOpA, blockOpB); // get A'
+                    xFormedOpB = TIF(blockOpB, blockOpA); // get B'
+                }
+                else if(B_op === 'DELETE'){
+                    xFormedOpA = TFD(blockOpA, blockOpB); // get A'
+                    xFormedOpB = TDF(blockOpB, blockOpA); // get B'
+                }
+                else if(B_op === 'EDIT'){
+                    xFormedOpA = TFE(blockOpA, blockOpB); // get A'
+                    xFormedOpB = TEF(blockOpB, blockOpA); // get B'
+                }
+                else if(B_op === 'FOCUS'){
+                    xFormedOpA = TFF(blockOpA, blockOpB); // get A'
+                    xFormedOpB = TFF(blockOpB, blockOpA); // get B'
+                }
+            }
+            
+            // transform
+            sleep(2000).then(()=>{
+                console.log(xFormedOpA)
+                console.log(xFormedOpB)
+                if(xFormedOpA.opName === 'INSERT'){
+
+                    newNodeB = document.createElement('div');
+                    newTextNodeB = document.createTextNode(xFormedOpA.content);
+                    newNodeB.appendChild(newTextNodeB);
+                    nodeOfClientB = document.getElementById('B_' + xFormedOpA.parentId);
+
+                    children = nodeOfClientB.children;
+                    nodeOfClientB.insertBefore(newNodeB, children[xFormedOpA.index]);
+                }
+                else if(xFormedOpA.opName === 'DELETE'){
+                    nodeOfClientB = document.getElementById('B_' + xFormedOpA.parentId);
+                    children = nodeOfClientB.children;
+                    nodeOfClientB.removeChild(children[xFormedOpA.index]);  
+                }
+                else if(xFormedOpA.opName === 'EDIT'){
+                    nodeOfClientB = document.getElementById('B_' + xFormedOpA.parentId);
+                    children = nodeOfClientB.children;
+                    children[xFormedOpA.index].innerHTML = xFormedOpA.content;
+                }
+                if(xFormedOpB.opName === 'INSERT'){
+                    newNodeA = document.createElement('div');
+                    newTextNodeA = document.createTextNode(xFormedOpB.content);
+                    newNodeA.appendChild(newTextNodeA);
+
+                    nodeOfClientA = document.getElementById('A_' + xFormedOpB.parentId);
+                    
+                    children = nodeOfClientA.children;
+                    nodeOfClientA.insertBefore(newNodeA, children[xFormedOpB.index]);
+                }
+                else if(xFormedOpB.opName === 'DELETE'){
+                    nodeOfClientA = document.getElementById('A_' + xFormedOpB.parentId);
+                    children = nodeOfClientA.children;
+                    nodeOfClientA.removeChild(children[xFormedOpB.index]);  
+                }
+                else if(xFormedOpB.opName === 'EDIT'){
+                    nodeOfClientA = document.getElementById('A_' + xFormedOpB.parentId);
+                    children = nodeOfClientA.children;
+                    children[xFormedOpB.index].innerHTML = xFormedOpB.content;
+                }
+            });
+        }
+
+    </script>
+</body>
+</html>
